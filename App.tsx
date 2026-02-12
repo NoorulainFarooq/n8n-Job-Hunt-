@@ -7,14 +7,14 @@ import InsightsPanel from './components/InsightsPanel';
 import { CompanyDetail, MarketInsight, SearchResponse } from './types';
 import { fetchCompanyData } from './services/geminiService';
 
-// n8n workflow webhook URL
-const WEBHOOK_URL = 'https://noorulain3.app.n8n.cloud/webhook/53cf372c-8f77-498a-990f-9d2d348389b7';
+const WEBHOOK_URL = 'https://noorulain-28.app.n8n.cloud/webhook/8650e67f-47bd-4b0a-8927-0fd5b8b7e1c4';
 
 const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState<CompanyDetail[]>([]);
   const [insights, setInsights] = useState<MarketInsight[]>([]);
+  const [sources, setSources] = useState<Array<{ title: string; uri: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [lastSearch, setLastSearch] = useState<string>('');
 
@@ -32,27 +32,30 @@ const App: React.FC = () => {
     setLastSearch(role);
 
     try {
-      // 1. Send data to the n8n workflow
+      // Triggering the production n8n workflow for external tracking/logging
       try {
         await fetch(WEBHOOK_URL, {
           method: 'POST',
+          mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             role, 
             timestamp: new Date().toISOString(),
-            platform: 'AI Company Scout Dashboard'
+            platform: 'AI Company Scout Dashboard',
+            source: 'Explore Button',
+            intent: 'Live Indeed Search'
           }),
         });
       } catch (webhookErr) {
-        console.warn('Webhook delivery failed, proceeding with search...');
+        console.warn('Webhook delivery failed, proceeding with direct search...');
       }
 
-      // 2. Fetch company data from Gemini
       const data: SearchResponse = await fetchCompanyData(role);
-      setCompanies(data.companies);
+      setCompanies(data.companies.slice(0, 5));
       setInsights(data.insights);
+      setSources(data.sources || []);
     } catch (err) {
-      setError('Search failed. Please ensure your API Key is correctly configured in the deployment environment.');
+      setError('Search failed to fetch live data. Please ensure your API_KEY is valid and has search grounding enabled.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -60,48 +63,75 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors font-sans selection:bg-primary-100 dark:selection:bg-primary-900/40">
+    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 transition-colors font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900/40 pb-20">
       <Header darkMode={darkMode} toggleDarkMode={() => setDarkMode(!darkMode)} />
 
-      <main className="container mx-auto px-4 py-12">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">
-            Company Scout <span className="text-primary-600">AI</span>
+      <main className="container mx-auto px-4 py-16">
+        <div className="text-center mb-16">
+          <h2 className="text-5xl font-black text-indigo-deep dark:text-white mb-6 tracking-tight leading-tight">
+            Live Indeed <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-cyan-electric">Scout</span>
           </h2>
-          <p className="text-slate-600 dark:text-slate-400 max-w-xl mx-auto text-lg">
-            Enter a role to discover companies actively hiring or investing in that expertise.
+          <p className="text-slate-soft dark:text-slate-400 max-w-2xl mx-auto text-xl font-medium leading-relaxed">
+            Searching Indeed.com and global career boards for current <span className="text-indigo-700 dark:text-indigo-400 font-bold italic underline decoration-cyan-electric/30 underline-offset-4">real</span> opportunities.
           </p>
         </div>
 
         <SearchBar onSearch={handleSearch} isLoading={loading} />
 
         {error && (
-          <div className="max-w-2xl mx-auto mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm">
+          <div className="max-w-2xl mx-auto mb-10 p-5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-2xl text-red-600 dark:text-red-400 text-sm font-bold flex items-center gap-3">
+            <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
             {error}
           </div>
         )}
 
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col xl:flex-row gap-10">
           <div className="flex-1">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {companies.map((company) => (
-                <CompanyCard key={company.id} company={company} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {companies.map((company, index) => (
+                <div key={company.id} className={index === 4 ? 'md:col-span-2 md:max-w-md md:mx-auto w-full' : ''}>
+                  <CompanyCard company={company} />
+                </div>
               ))}
             </div>
             
+            {sources.length > 0 && (
+              <div className="mt-16 p-8 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200 dark:border-zinc-800">
+                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"></path></svg>
+                  Verified Data Sources
+                </h3>
+                <div className="flex flex-wrap gap-4">
+                  {sources.map((src, idx) => (
+                    <a 
+                      key={idx} 
+                      href={src.uri} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold text-indigo-700 dark:text-indigo-400 hover:underline px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg transition-colors border border-indigo-100 dark:border-indigo-800/50"
+                    >
+                      {src.title}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             {!lastSearch && !loading && (
-              <div className="flex flex-col items-center justify-center py-20 opacity-40">
-                <svg className="w-16 h-16 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-                <p className="text-lg">Start by searching for a job role above</p>
+              <div className="flex flex-col items-center justify-center py-24 group">
+                <div className="w-24 h-24 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center shadow-xl mb-6 group-hover:scale-110 transition-transform border border-slate-100 dark:border-zinc-800">
+                  <svg className="w-10 h-10 text-indigo-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <p className="text-xl font-bold text-slate-soft dark:text-zinc-600 tracking-tight">Search live for your next role</p>
               </div>
             )}
             
             {loading && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-50 animate-pulse">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="h-48 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-pulse">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className={`h-64 bg-slate-200/50 dark:bg-zinc-800/50 rounded-3xl ${i === 5 ? 'md:col-span-2 md:max-w-md md:mx-auto w-full' : ''}`}></div>
                 ))}
               </div>
             )}
@@ -113,8 +143,8 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <footer className="py-8 border-t border-slate-200 dark:border-slate-800 text-center text-slate-500 dark:text-slate-500 text-sm">
-        <p>© {new Date().getFullYear()} AI Company Scout. Professional talent extraction dashboard.</p>
+      <footer className="py-12 border-t border-slate-200 dark:border-zinc-800 text-center text-slate-soft dark:text-zinc-600 text-sm font-medium">
+        <p>© {new Date().getFullYear()} AI Company Scout. Powering your career with live search grounding.</p>
       </footer>
     </div>
   );
